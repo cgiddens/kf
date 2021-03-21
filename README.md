@@ -1,1 +1,3 @@
-# Top-Level README
+$ mkdir build && cd build
+$ cmake .. && make install
+$ ./kf
