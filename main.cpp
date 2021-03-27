@@ -79,11 +79,18 @@ void filter(VectorXd &x, MatrixXd &P) {
     // TODO: YOUR CODE HERE
 		
     // KF Measurement update step
-		 
+    VectorXd y = z - (H * x); // calculate error between predicted measurement and sensor data by mapping x into sensor space with H
+    VectorXd S = (H * P * H.transpose()) + R; // calculate measurement uncertainty by mapping state uncertainty into measurement space and adding measurement noise R
+    VectorXd K = P * H.transpose() * S.inverse(); // calculate Kalman gain by comparing state uncertainty with measurement uncertainty
+
     // new state
-		
+    x = x + (K * y); // update state with measurement error, weighted by Kalman gain
+    P = (I - (K * H)) * P; // update covariances (will always go down, depending on Kalman gain, AKA how confident you are in your measurement)
+
     // KF Prediction step
-		
+    x = (F * x) + u; // propagate state w/ state transition matrix and "input vector" u, which is actually process model uncertainty
+    P = (F * P * F.transpose()) + Q; // propagate covariances, add process noise / "process covariance" Q that corresponds to noise vector u
+
     cout << "x=" << endl <<  x << endl;
     cout << "P=" << endl <<  P << endl;
   }
