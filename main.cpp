@@ -1,97 +1,79 @@
-/** 
- * Write a function 'filter()' that implements a multi-
- *   dimensional Kalman Filter for the example given
- */
-
 #include <iostream>
+#include <sstream>
 #include <vector>
 #include "Dense"
+#include "measurement_package.h"
+#include "tracking.h"
 
+using Eigen::MatrixXd;
+using Eigen::VectorXd;
 using std::cout;
 using std::endl;
+using std::ifstream;
+using std::istringstream;
+using std::string;
 using std::vector;
-using Eigen::VectorXd;
-using Eigen::MatrixXd;
-
-// Kalman Filter variables
-VectorXd x;	// object state
-MatrixXd P;	// object covariance matrix
-VectorXd u;	// external motion
-MatrixXd F; // state transition matrix
-MatrixXd H;	// measurement matrix
-MatrixXd R;	// measurement covariance matrix
-MatrixXd I; // Identity matrix
-MatrixXd Q;	// process covariance matrix
-
-vector<VectorXd> measurements;
-void filter(VectorXd &x, MatrixXd &P);
 
 
 int main() {
+
   /**
-   * Code used as example to work with Eigen matrices
+   * Set Measurements
    */
-  // design the KF with 1D motion
-  x = VectorXd(2);
-  x << 0, 0;
+  vector<MeasurementPackage> measurement_pack_list;
 
-  P = MatrixXd(2, 2);
-  P << 1000, 0, 0, 1000;
+  // hardcoded input file with laser and radar measurements
+  string in_file_name_ = "obj_pose-laser-radar-synthetic-input.txt";
+  ifstream in_file(in_file_name_.c_str(), ifstream::in);
 
-  u = VectorXd(2);
-  u << 0, 0;
-
-  F = MatrixXd(2, 2);
-  F << 1, 1, 0, 1;
-
-  H = MatrixXd(1, 2);
-  H << 1, 0;
-
-  R = MatrixXd(1, 1);
-  R << 1;
-
-  I = MatrixXd::Identity(2, 2);
-
-  Q = MatrixXd(2, 2);
-  Q << 0, 0, 0, 0;
-
-  // create a list of measurements
-  VectorXd single_meas(1);
-  single_meas << 1;
-  measurements.push_back(single_meas);
-  single_meas << 2;
-  measurements.push_back(single_meas);
-  single_meas << 3;
-  measurements.push_back(single_meas);
-
-  // call Kalman filter algorithm
-  filter(x, P);
-
-  return 0;
-}
-
-
-void filter(VectorXd &x, MatrixXd &P) {
-
-  for (unsigned int n = 0; n < measurements.size(); ++n) {
-
-    VectorXd z = measurements[n];
-    // TODO: YOUR CODE HERE
-		
-    // KF Measurement update step
-    VectorXd y = z - (H * x); // calculate error between predicted measurement and sensor data by mapping x into sensor space with H
-    VectorXd S = (H * P * H.transpose()) + R; // calculate measurement uncertainty by mapping state uncertainty into measurement space and adding measurement noise R
-    VectorXd K = P * H.transpose() * S.inverse(); // calculate Kalman gain by comparing state uncertainty with measurement uncertainty
-
-    // new state
-    x = x + (K * y); // update state with measurement error, weighted by Kalman gain
-    P = (I - (K * H)) * P; // update covariances (will always go down, depending on Kalman gain, AKA how confident you are in your measurement)
-
-    // KF Prediction step
-    x = (F * x) + u; // propagate state w/ state transition matrix and "input vector" u, which is actually process model uncertainty
-    P = (F * P * F.transpose()) + Q; // propagate covariances, add process noise / "process covariance" Q that corresponds to noise vector u
-
-    cout << "x=" << endl <<  x << endl;
-    cout << "P=" << endl <<  P << endl;
+  if (!in_file.is_open()) {
+    cout << "Cannot open input file: " << in_file_name_ << endl;
   }
+
+  string line;
+  // set i to get only first 3 measurments
+  int i = 0;
+  while (getline(in_file, line) && (i<=3)) {
+
+    MeasurementPackage meas_package;
+
+    istringstream iss(line);
+    string sensor_type;
+    iss >> sensor_type; // reads first element from the current line
+    int64_t timestamp;
+    if (sensor_type.compare("L") == 0) {  // laser measurement
+      // read measurements
+      meas_package.sensor_type_ = MeasurementPackage::LASER;
+      meas_package.raw_measurements_ = VectorXd(2);
+      float x;
+      float y;
+      iss >> x;
+      iss >> y;
+      meas_package.raw_measurements_ << x,y;
+      iss >> timestamp;
+      meas_package.timestamp_ = timestamp;
+      measurement_pack_list.push_back(meas_package);
+
+    } else if (sensor_type.compare("R") == 0) {
+      // Skip Radar measurements
+      continue;
+    }
+    ++i;
+  }
+
+  // Create a Tracking instance
+  Tracking tracking;
+
+  // call the ProcessingMeasurement() function for each measurement
+  size_t N = measurement_pack_list.size();
+  // start filtering from the second frame 
+  // (the speed is unknown in the first frame)
+  for (size_t k = 0; k < N; ++k) {
+    tracking.ProcessMeasurement(measurement_pack_list[k]);
+  }
+
+  if (in_file.is_open()) {
+    in_file.close();
+  }
+  return 0;
 }

@@ -1,0 +1,3 @@
+/home/vagrant/dev/kf/jacobian/build/CMakeFiles/rebuild_cache.dir
+/home/vagrant/dev/kf/jacobian/build/CMakeFiles/jacobian.dir
+/home/vagrant/dev/kf/jacobian/build/CMakeFiles/edit_cache.dir
